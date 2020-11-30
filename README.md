@@ -1,0 +1,1 @@
+This repository contains code for practical tasks from Parallel Algorithms course in ITMO University.
