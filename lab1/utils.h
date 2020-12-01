@@ -15,6 +15,10 @@ public:
 
 template <typename T>
 class Integrator{
+private:
+    int numOfThreads;
+    std::string type;
 public:
     virtual int integrate(double a, double b, T func) = 0;
+    virtual int getNumOfThreads() = 0;
 };
