@@ -2,8 +2,10 @@
 #include <omp.h>
 #include "utils.h"
 #include <fstream>
+#include <cmath>
 
-#define eps 0.00001
+#define EPS 0.0000000001
+#define RES_DIR "../results/"
 
 class SineFunction : public BaseFunction{
 public:
@@ -38,7 +40,7 @@ public:
         double error = 1000;
         int n = 3;
 
-        while (abs(error) > eps*integral){
+        while (abs(error) > EPS*integral){
             prev_integral = integral;
             integral = 0;
             double step = (b - a) / n;
@@ -77,7 +79,7 @@ public:
         double error = 1000;
         int n = 3;
 
-        while (abs(error) > eps*integral){
+        while (abs(error) > EPS*integral){
             prev_integral = integral;
             integral = 0;
             double step = (b - a) / n;
@@ -119,7 +121,7 @@ public:
         double error = 1000;
         int n = 3;
 
-        while (abs(error) > eps*integral){
+        while (abs(error) > EPS*integral){
             prev_integral = integral;
             integral = 0;
             double step = (b - a) / n;
@@ -164,7 +166,7 @@ public:
 
         omp_lock_t integral_update_lock;
         omp_init_lock(&integral_update_lock);
-        while (abs(error) > eps*integral){
+        while (abs(error) > EPS*integral){
             prev_integral = integral;
             integral = 0;
             double step = (b - a) / n;
@@ -207,7 +209,7 @@ public:
         double error = 1000;
         int n = 3;
 
-        while (abs(error) > eps*integral){
+        while (abs(error) > EPS*integral){
             prev_integral = integral;
             integral = 0;
             double step = (b - a) / n;
@@ -230,7 +232,7 @@ public:
 template<typename T>
 void run_integrals(T integrator)
 {
-    std::ofstream log_file("../" + integrator.type + ".csv");
+    std::ofstream log_file( RES_DIR + integrator.type + ".csv");
     auto function = SineFunction();
 
     std::cout << "Start " << integrator.type << " computation";
@@ -264,7 +266,7 @@ int main() {
     auto serial_integrator = SerialIntegrator();
     run_integrals(serial_integrator);
 
-    for (auto i=1; i<=3; i++) {
+    for (auto i=1; i<=16; i++) {
 
         int n_threads = i*2;
         auto atomic_integrator = AtomicIntegrator(n_threads);
