@@ -3,7 +3,7 @@
 #include "utils.h"
 #include <fstream>
 
-#define eps 0.00001
+#define N 100000
 
 class SineFunction : public BaseFunction{
 public:
@@ -33,27 +33,20 @@ public:
         return numOfThreads;
     }
 
-    int integrate(double a, double b, SineFunction func){
-        double integral = 0, prev_integral = 0;
-        double error = 1000;
-        int n = 3;
+    int integrate(double a, double b, SineFunction func, int n_steps = N){
+        double integral = 0;
 
-        while (abs(error) > eps*integral){
-            prev_integral = integral;
-            integral = 0;
-            double step = (b - a) / n;
-            double x;
-            for (int i=1; i < n-1; i++){
-                x = a + i * step;
-                integral += func.call(x);
-            }
-            integral += func.call(a)/2 + func.call(b)/2;
-            integral *= step;
-
-            error = integral - prev_integral;
-            n++;
+        double step = (b - a) / n_steps;
+        double x;
+        for (int i=1; i < n_steps; i++){
+            x = a + i * step;
+            integral += func.call(x);
         }
-        return n;
+        integral += func.call(a)/2 + func.call(b)/2;
+        integral *= step;
+
+        double true_integral = func.integral(a, b);
+        return abs(integral - true_integral) / true_integral ;
     }
 };
 
@@ -64,7 +57,7 @@ public:
     std::string type = "Atomic";
     AtomicIntegrator(int numberOfThreads){
         numOfThreads = numberOfThreads;
-        type += "_" + std::to_string(numOfThreads);
+        // type += "_" + std::to_string(numOfThreads);
     }
 
     int getNumOfThreads(){
@@ -72,29 +65,22 @@ public:
     }
 
 
-    int integrate(double a, double b, SineFunction func){
-        double integral = 0, prev_integral = 0;
-        double error = 1000;
-        int n = 3;
+    int integrate(double a, double b, SineFunction func, int n_steps = N){
+        double integral = 0;
 
-        while (abs(error) > eps*integral){
-            prev_integral = integral;
-            integral = 0;
-            double step = (b - a) / n;
-            double x;
-            #pragma omp parallel for num_threads(numOfThreads) private(x)
-            for (int i=1; i < n-1; i++){
-                x = a + i * step;
-                #pragma omp atomic
-                integral += func.call(x);
-            }
-            integral += func.call(a)/2 + func.call(b)/2;
-            integral *= step;
-
-            error = integral - prev_integral;
-            n++;
+        double step = (b - a) / n_steps;
+        double x;
+        #pragma omp parallel for num_threads(numOfThreads) private(x)
+        for (int i=0; i < n_steps; i++){
+            x = a + i * step;
+            #pragma omp atomic
+            integral += func.call(x);
         }
-        return n;
+        integral += func.call(a)/2 + func.call(b)/2;
+        integral *= step;
+
+        double true_integral = func.integral(a, b);
+        return abs(integral - true_integral) / true_integral ;
     }
 };
 
@@ -106,7 +92,7 @@ public:
 
     CriticalIntegrator(int numberOfThreads){
         numOfThreads = numberOfThreads;
-        type += "_" + std::to_string(numOfThreads);
+        // type += "_" + std::to_string(numOfThreads);
     }
 
     int getNumOfThreads(){
@@ -114,31 +100,23 @@ public:
     }
 
 
-    int integrate(double a, double b, SineFunction func){
-        double integral = 0, prev_integral = 0;
-        double error = 1000;
-        int n = 3;
+    int integrate(double a, double b, SineFunction func, int n_steps=N){
+        double integral = 0;
 
-        while (abs(error) > eps*integral){
-            prev_integral = integral;
-            integral = 0;
-            double step = (b - a) / n;
-            double x;
-            #pragma omp parallel for num_threads(numOfThreads) private(x)
-            for (int i=1; i < n-1; i++){
-                x = a + i * step;
-                #pragma omp critical
-                {
+        double step = (b - a) / n_steps;
+        double x;
+        #pragma omp parallel for num_threads(numOfThreads) private(x)
+        for (int i=0; i < n_steps; i++){
+            x = a + i * step;
+            #pragma omp critical{
                 integral += func.call(x);
-                }
             }
-            integral += func.call(a)/2 + func.call(b)/2;
-            integral *= step;
-
-            error = integral - prev_integral;
-            n++;
         }
-        return n;
+        integral += func.call(a)/2 + func.call(b)/2;
+        integral *= step;
+
+        double true_integral = func.integral(a, b);
+        return abs(integral - true_integral) / true_integral ;
     }
 };
 
@@ -150,39 +128,33 @@ public:
 
     LockIntegrator(int numberOfThreads){
         numOfThreads = numberOfThreads;
-        type += "_" + std::to_string(numOfThreads);
+        // type += "_" + std::to_string(numOfThreads);
     }
 
     int getNumOfThreads(){
         return numOfThreads;
     }
 
-    int integrate(double a, double b, SineFunction func){
-        double integral = 0, prev_integral = 0;
-        double error = 1000;
-        int n = 3;
+    int integrate(double a, double b, SineFunction func, int n_steps=N){
+        double integral = 0;
 
         omp_lock_t integral_update_lock;
         omp_init_lock(&integral_update_lock);
-        while (abs(error) > eps*integral){
-            prev_integral = integral;
-            integral = 0;
-            double step = (b - a) / n;
-            double x;
-#pragma omp parallel for num_threads(numOfThreads) private(x)
-            for (int i=1; i < n-1; i++){
-                x = a + i * step;
-                omp_set_lock(&integral_update_lock);
-                integral += func.call(x);
-                omp_unset_lock(&integral_update_lock);
-            }
-            integral += func.call(a)/2 + func.call(b)/2;
-            integral *= step;
-
-            error = integral - prev_integral;
-            n++;
+        integral = 0;
+        double step = (b - a) / n_steps;
+        double x;
+        #pragma omp parallel for num_threads(numOfThreads) private(x)
+        for (int i=0; i < n_steps; i++){
+            x = a + i * step;
+            omp_set_lock(&integral_update_lock);
+            integral += func.call(x);
+            omp_unset_lock(&integral_update_lock);
         }
-        return n;
+        integral += func.call(a)/2 + func.call(b)/2;
+        integral *= step;
+
+        double true_integral = func.integral(a, b);
+        return abs(integral - true_integral) / true_integral ;
     }
 };
 
@@ -194,43 +166,38 @@ public:
 
     ReductionIntegrator(int numberOfThreads){
         numOfThreads = numberOfThreads;
-        type += "_" + std::to_string(numOfThreads);
-        omp_set_num_threads(numOfThreads);
+        // type += "_" + std::to_string(numOfThreads);
+        // omp_set_num_threads(numOfThreads);
     }
 
     int getNumOfThreads(){
         return numOfThreads;
     }
 
-    int integrate(double a, double b, SineFunction func){
-        double integral = 0, prev_integral = 0;
-        double error = 1000;
-        int n = 3;
+    int integrate(double a, double b, SineFunction func, int n_steps = N){
+        double integral = 0;
 
-        while (abs(error) > eps*integral){
-            prev_integral = integral;
-            integral = 0;
-            double step = (b - a) / n;
-            double x;
-#pragma omp parallel for private(x) reduction(+:integral)
-            for (int i = 1; i < n - 1; i++) {
-                x = a + i * step;
-                integral += func.call(x);
-            }
-            integral += func.call(a)/2 + func.call(b)/2;
-            integral *= step;
-
-            error = integral - prev_integral;
-            n++;
+        double step = (b - a) / n_steps;
+        double x;
+        #pragma omp parallel for private(x) reduction(+:integral)
+        for (int i = 1; i < n_steps; i++) {
+            x = a + i * step;
+            integral += func.call(x);
         }
-        return n;
+        integral += func.call(a)/2 + func.call(b)/2;
+        integral *= step;
+
+        double true_integral = func.integral(a, b);
+        return abs(integral - true_integral) / true_integral ;
     }
 };
 
 template<typename T>
-void run_integrals(T integrator)
-{
-    std::ofstream log_file("../" + integrator.type + ".csv");
+void run_integrals(T integrator){
+
+    std::ofstream log_file("../result/" + integrator.type + "/" + integrator.type + "_" +
+                           std::to_string(integrator.getNumOfThreads()) + ".csv");
+
     auto function = SineFunction();
 
     std::cout << "Start " << integrator.type << " computation";
@@ -243,7 +210,7 @@ void run_integrals(T integrator)
 
     double a=0.000001, b;
     double t1,t2;
-    log_file << "a,b,N,t";
+    log_file << "a,b,eps,t";
     for (auto k=0;k<7;k++){
         a = a*10;
         b = a*10;
@@ -264,7 +231,7 @@ int main() {
     auto serial_integrator = SerialIntegrator();
     run_integrals(serial_integrator);
 
-    for (auto i=1; i<=3; i++) {
+    for (auto i=1; i<=8; i++) {
 
         int n_threads = i*2;
         auto atomic_integrator = AtomicIntegrator(n_threads);
