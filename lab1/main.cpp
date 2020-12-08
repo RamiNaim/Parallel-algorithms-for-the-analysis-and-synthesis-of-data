@@ -216,10 +216,10 @@ void run_integrals(T integrator){
         b = a*10;
 
         t1 = omp_get_wtime();
-        auto n_of_steps = integrator.integrate(a, b, function);
+        auto eps = integrator.integrate(a, b, function);
         t2 = omp_get_wtime();
 
-        log_file << "\n" << a << "," << b << "," << n_of_steps << "," << t2 - t1;
+        log_file << "\n" << a << "," << b << "," << eps << "," << t2 - t1;
     }
 
     log_file.close();
