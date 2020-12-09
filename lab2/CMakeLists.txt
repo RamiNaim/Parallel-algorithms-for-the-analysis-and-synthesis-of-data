@@ -6,4 +6,5 @@ set(CMAKE_C_COMPILER "/usr/bin/mpicc")
 set(CMAKE_CXX_COMPILER "/usr/bin/mpic++")
 
 include_directories(/usr/include/mpi/)
-add_executable(lab2 main.cpp include/utils.h mpi_algo1.cpp)
+add_executable(lab2 main.cpp include/utils.h)
+add_executable(mpi_algo1 mpi_algo1.cpp include/utils.h)

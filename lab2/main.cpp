@@ -1,10 +1,10 @@
-#include <iostream>
-#include "mpi.h"
 #include "include/utils.h"
 #include <ctime>
 #include <cstdlib>
+#include <chrono>
+#include <mpi.h>
 
-#define N 10
+#define N 200
 
 using namespace std;
 
@@ -36,52 +36,27 @@ int main(int argc, char* argv[]) {
     generateRandomMatrix("input/A.txt", N);
     generateRandomMatrix("input/B.txt", N);
 
-    /*
-    if (!is_file_exist("input/A.txt")){
-        generateRandomMatrix("input/A.txt", N);
-    }
-
-    if (!is_file_exist("input/B.txt")){
-        generateRandomMatrix("input/B.txt", N);
-    }
-    */
-
     readMatrix("input/A.txt", &A);
     readMatrix("input/B.txt", &B);
 
+    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    auto start = MPI_Wtime();
     auto C = serialMatrixMult(A, B);
+    auto end = MPI_Wtime();
+    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
+    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
+    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
+
+    cout << "Elapsed time: " << end - start << endl;
+
+    /*
     for (auto& row:C){
         for (auto& elem:row ){
             cout << elem << " ";
         }
         cout << "\n";
     }
-
-    /*
-    int ProcNum, ProcRank, RecvRank;
-
-    MPI_Status Status;
-    MPI_Init(&argc, &argv); //init parallel block
-    MPI_Comm_size(MPI_COMM_WORLD, &ProcNum);
-    MPI_Comm_rank(MPI_COMM_WORLD, &ProcRank);
-
-    if ( ProcRank == 0 ) { // Process with Rank=0
-        printf ("\n Hello from process %3d", ProcRank);
-        std::cout << "Master Thread with rank = " << ProcRank << " with total number of threads of " << ProcNum << std::endl;
-
-        for ( int i=1; i < ProcNum; i++ ) {
-            MPI_Recv(&RecvRank, 1, MPI_INT, MPI_ANY_SOURCE,
-
-                     MPI_ANY_TAG, MPI_COMM_WORLD, &Status);
-
-            printf("\n Hello from process %3d", RecvRank);
-        }
-    }
-    else // All other processes
-        MPI_Send(&ProcRank,1,MPI_INT,0,0,MPI_COMM_WORLD);
-
-    MPI_Finalize(); // terminate parallel block
     */
 
     return 0;
