@@ -1,10 +1,9 @@
 #include "include/utils.h"
 #include <ctime>
 #include <cstdlib>
-#include <chrono>
 #include <mpi.h>
 
-#define N 200
+#define N 300
 
 using namespace std;
 
@@ -29,35 +28,27 @@ vector<vector<double>> serialMatrixMult(vector<vector<double>>& A,  vector<vecto
 }
 
 int main(int argc, char* argv[]) {
-    srand (static_cast <unsigned> (time(0)));
+    srand (time(0));
 
     vector<vector<double>> A, B;
 
-    generateRandomMatrix("input/A.txt", N);
-    generateRandomMatrix("input/B.txt", N);
+    readMatrix("./input/A.txt", &A);
+    readMatrix("./input/B.txt", &B);
 
-    readMatrix("input/A.txt", &A);
-    readMatrix("input/B.txt", &B);
-
-    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     auto start = MPI_Wtime();
     auto C = serialMatrixMult(A, B);
     auto end = MPI_Wtime();
-    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
-    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[µs]" << std::endl;
-    // std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::nanoseconds> (end - begin).count() << "[ns]" << std::endl;
 
     cout << "Elapsed time: " << end - start << endl;
 
-    /*
-    for (auto& row:C){
-        for (auto& elem:row ){
-            cout << elem << " ";
+    std::ofstream c_file("./output/C_serial.txt");
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<N;j++){
+            c_file << std::to_string(C[i][j]) << " ";
         }
-        cout << "\n";
+        c_file << std::endl;
     }
-    */
 
     return 0;
 }

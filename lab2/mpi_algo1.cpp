@@ -1,20 +1,23 @@
-#include<stdio.h>
-#include<mpi.h>
-#define NUM_ROWS_A 200 //rows of input [A]
-#define NUM_COLUMNS_A 200 //columns of input [A]
-#define NUM_ROWS_B 200 //rows of input [B]
-#define NUM_COLUMNS_B 200 //columns of input [B]
+#include <cstdio>
+#include <mpi.h>
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+
+#define N 300 //dimensions of matrices
 #define MASTER_TO_SLAVE_TAG 1 //tag for messages sent from master to slaves
 #define SLAVE_TO_MASTER_TAG 4 //tag for messages sent from slaves to master
 void makeAB(); //makes the [A] and [B] matrixes
 void printArray(); //print the content of output matrix [C];
+void writeMatrices();
 
 int rank; //process rank
 int size; //number of processes
 int i, j, k; //helper variables
-double mat_a[NUM_ROWS_A][NUM_COLUMNS_A]; //declare input [A]
-double mat_b[NUM_ROWS_B][NUM_COLUMNS_B]; //declare input [B]
-double mat_result[NUM_ROWS_A][NUM_COLUMNS_B]; //declare output [C]
+double mat_a[N][N]; //declare input [A]
+double mat_b[N][N]; //declare input [B]
+double mat_c[N][N]; //declare output [C]
 double start_time; //hold start time
 double end_time; // hold end time
 int low_bound; //low bound of the number of rows of [A] allocated to a slave
@@ -35,10 +38,10 @@ int main(int argc, char *argv[])
         makeAB();
         start_time = MPI_Wtime();
         for (i = 1; i < size; i++) {//for each slave other than the master
-            portion = (NUM_ROWS_A / (size - 1)); // calculate portion without master
+            portion = (N / (size - 1)); // calculate portion without master
             low_bound = (i - 1) * portion;
-            if (((i + 1) == size) && ((NUM_ROWS_A % (size - 1)) != 0)) {//if rows of [A] cannot be equally divided among slaves
-                upper_bound = NUM_ROWS_A; //last slave gets all the remaining rows
+            if (((i + 1) == size) && ((N % (size - 1)) != 0)) {//if rows of [A] cannot be equally divided among slaves
+                upper_bound = N; //last slave gets all the remaining rows
             } else {
                 upper_bound = low_bound + portion; //rows of [A] are equally divisable among slaves
             }
@@ -47,11 +50,11 @@ int main(int argc, char *argv[])
             //next send the upper bound without blocking, to the intended slave
             MPI_Isend(&upper_bound, 1, MPI_INT, i, MASTER_TO_SLAVE_TAG + 1, MPI_COMM_WORLD, &request);
             //finally send the allocated row portion of [A] without blocking, to the intended slave
-            MPI_Isend(&mat_a[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_A, MPI_DOUBLE, i, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &request);
+            MPI_Isend(&mat_a[low_bound][0], (upper_bound - low_bound) * N, MPI_DOUBLE, i, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &request);
         }
     }
     //broadcast [B] to all the slaves
-    MPI_Bcast(&mat_b, NUM_ROWS_B*NUM_COLUMNS_B, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&mat_b, N*N, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
     /* work done by slaves*/
     if (rank > 0) {
@@ -60,11 +63,11 @@ int main(int argc, char *argv[])
         //next receive upper bound from the master
         MPI_Recv(&upper_bound, 1, MPI_INT, 0, MASTER_TO_SLAVE_TAG + 1, MPI_COMM_WORLD, &status);
         //finally receive row portion of [A] to be processed from the master
-        MPI_Recv(&mat_a[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_A, MPI_DOUBLE, 0, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &status);
+        MPI_Recv(&mat_a[low_bound][0], (upper_bound - low_bound) * N, MPI_DOUBLE, 0, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &status);
         for (i = low_bound; i < upper_bound; i++) {//iterate through a given set of rows of [A]
-            for (j = 0; j < NUM_COLUMNS_B; j++) {//iterate through columns of [B]
-                for (k = 0; k < NUM_ROWS_B; k++) {//iterate through rows of [B]
-                    mat_result[i][j] += (mat_a[i][k] * mat_b[k][j]);
+            for (j = 0; j < N; j++) {//iterate through columns of [B]
+                for (k = 0; k < N; k++) {//iterate through rows of [B]
+                    mat_c[i][j] += (mat_a[i][k] * mat_b[k][j]);
                 }
             }
         }
@@ -73,7 +76,7 @@ int main(int argc, char *argv[])
         //send the upper bound next without blocking, to the master
         MPI_Isend(&upper_bound, 1, MPI_INT, 0, SLAVE_TO_MASTER_TAG + 1, MPI_COMM_WORLD, &request);
         //finally send the processed portion of data without blocking, to the master
-        MPI_Isend(&mat_result[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_B, MPI_DOUBLE, 0, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &request);
+        MPI_Isend(&mat_c[low_bound][0], (upper_bound - low_bound) * N, MPI_DOUBLE, 0, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &request);
     }
 
     /* master gathers processed work*/
@@ -84,11 +87,12 @@ int main(int argc, char *argv[])
             //receive upper bound from a slave
             MPI_Recv(&upper_bound, 1, MPI_INT, i, SLAVE_TO_MASTER_TAG + 1, MPI_COMM_WORLD, &status);
             //receive processed data from a slave
-            MPI_Recv(&mat_result[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_B, MPI_DOUBLE, i, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &status);
+            MPI_Recv(&mat_c[low_bound][0], (upper_bound - low_bound) * N, MPI_DOUBLE, i, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &status);
         }
         end_time = MPI_Wtime();
         printf("\nRunning Time = %f\n\n", end_time - start_time);
-        printArray();
+        // printArray();
+        writeMatrices();
     }
     MPI_Finalize(); //finalize MPI operations
     return 0;
@@ -96,36 +100,58 @@ int main(int argc, char *argv[])
 
 void makeAB()
 {
-    for (i = 0; i < NUM_ROWS_A; i++) {
-        for (j = 0; j < NUM_COLUMNS_A; j++) {
-            mat_a[i][j] = i + j;
+    srand(time(0));
+
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            mat_a[i][j] = 1.0*rand() / RAND_MAX;
         }
     }
-    for (i = 0; i < NUM_ROWS_B; i++) {
-        for (j = 0; j < NUM_COLUMNS_B; j++) {
-            mat_b[i][j] = i*j;
+    for (i = 0; i < N; i++) {
+        for (j = 0; j < N; j++) {
+            mat_b[i][j] = 1.0*rand() / RAND_MAX;
         }
     }
 }
 
 void printArray()
 {
-    for (i = 0; i < NUM_ROWS_A; i++) {
+    for (i = 0; i < N; i++) {
         printf("\n");
-        for (j = 0; j < NUM_COLUMNS_A; j++)
+        for (j = 0; j < N; j++)
             printf("%8.2f  ", mat_a[i][j]);
     }
     printf("\n\n\n");
-    for (i = 0; i < NUM_ROWS_B; i++) {
+    for (i = 0; i < N; i++) {
         printf("\n");
-        for (j = 0; j < NUM_COLUMNS_B; j++)
+        for (j = 0; j < N; j++)
             printf("%8.2f  ", mat_b[i][j]);
     }
     printf("\n\n\n");
-    for (i = 0; i < NUM_ROWS_A; i++) {
+    for (i = 0; i < N; i++) {
         printf("\n");
-        for (j = 0; j < NUM_COLUMNS_B; j++)
-            printf("%8.2f  ", mat_result[i][j]);
+        for (j = 0; j < N; j++)
+            printf("%8.2f  ", mat_c[i][j]);
     }
     printf("\n\n");
+}
+
+
+void writeMatrices()
+{
+    std::ofstream a_file("./input/A.txt");
+    std::ofstream b_file("./input/B.txt");
+    std::ofstream c_file("./output/C_mpi1.txt");
+
+    for (int i=0;i<N;i++){
+        for (int j=0;j<N;j++){
+            a_file << std::to_string(mat_a[i][j]) << " ";
+            b_file << std::to_string(mat_b[i][j]) << " ";
+            c_file << std::to_string(mat_c[i][j]) << " ";
+        }
+        a_file << std::endl;
+        b_file << std::endl;
+        c_file << std::endl;
+    }
+
 }

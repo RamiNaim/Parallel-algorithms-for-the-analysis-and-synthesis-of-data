@@ -9,27 +9,6 @@
 
 using namespace std;
 
-bool is_file_exist(const char *fileName)
-{
-    std::ifstream infile(fileName);
-    return infile.good();
-}
-
-void generateRandomMatrix(const string& fname, int n){
-    ofstream file(fname);
-    double val;
-
-    for (int i=0;i<n;i++){
-        for (int j=0;j<n;j++){
-            val = 1.0*rand() / RAND_MAX;
-            file << val << " ";
-        }
-        file << "\n";
-    }
-
-    file.close();
-}
-
 void readMatrix(const string& fname, vector<vector<double>>* buffer){
     ifstream file(fname, ios::in);
 
